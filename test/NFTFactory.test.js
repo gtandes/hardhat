@@ -1,9 +1,9 @@
 const { expect } = require("chai");
-const { ethers, upgrades } = require("ethers");
+const { ethers, upgrades } = require("hardhat");
 
 describe("NFTFactory", function () {
   let NFTFactory, factory, NFTCollection721, NFTCollection1155, owner, addr1;
-  const mintPrice = ethers.utils.parseEther("0.1"); // 0.1 ETH
+  const mintPrice = ethers.parseEther("0.1"); // 0.1 ETH
   const maxSupply = 10;
   const startTime = Math.floor(Date.now() / 1000); // current time
   const endTime = startTime + 3600; // 1 hour from now

@@ -3,7 +3,7 @@ const { ethers } = require("ethers");
 
 describe("NFTCollection1155", function () {
   let NFTCollection1155, nftCollection, owner, addr1, addr2;
-  const mintPrice = ethers.utils.parseEther("0.1"); // 0.1 ETH
+  const mintPrice = ethers.parseEther("0.1"); // 0.1 ETH
   const maxSupply = 100;
   const startTime = Math.floor(Date.now() / 1000); // current time
   const endTime = startTime + 3600; // 1 hour from now
@@ -57,7 +57,7 @@ describe("NFTCollection1155", function () {
 
       // Fast forward time to after the end time
       await ethers.provider.send("evm_increaseTime", [3600]);
-      await ethers.provider.send("evm_mine");
+      await ethers.provider.send("evm_mine", []);
 
       await expect(
         nftCollection.connect(addr1).mint(addr1.address, amount, data, { value: mintPrice })
@@ -67,7 +67,7 @@ describe("NFTCollection1155", function () {
     it("Should not allow minting with insufficient funds", async function () {
       const amount = 1;
       const data = "0x";
-      const insufficientFunds = ethers.utils.parseEther("0.05"); // 0.05 ETH
+      const insufficientFunds = ethers.parseEther("0.05"); // 0.05 ETH
 
       await expect(
         nftCollection.connect(addr1).mint(addr1.address, amount, data, { value: insufficientFunds })
@@ -79,16 +79,16 @@ describe("NFTCollection1155", function () {
       const data = "0x";
 
       await expect(
-        nftCollection.connect(addr1).mint(addr1.address, amount, data, { value: mintPrice.mul(amount) })
+        nftCollection.connect(addr1).mint(addr1.address, amount, data, { value: mintPrice * amount })
       ).to.be.revertedWith("Max supply reached");
     });
   });
 
   describe("Royalties", function () {
     it("Should set the correct royalties", async function () {
-      const [receiver, royaltyAmount] = await nftCollection.royaltyInfo(0, ethers.utils.parseEther("1"));
+      const [receiver, royaltyAmount] = await nftCollection.royaltyInfo(0, ethers.parseEther("1"));
       expect(receiver).to.equal(owner.address);
-      expect(royaltyAmount).to.equal(ethers.utils.parseEther("0.05")); // 5% of 1 ETH
+      expect(royaltyAmount).to.equal(ethers.parseEther("0.05")); // 5% of 1 ETH
     });
   });
 });
