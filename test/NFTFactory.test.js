@@ -1,5 +1,6 @@
 const { expect } = require("chai");
-const { ethers, upgrades } = require("hardhat");
+const { ethers } = require("ethers");
+const {upgrades} = require("hardhat");
 
 describe("NFTFactory", function () {
   let NFTFactory, factory, NFTCollection721, NFTCollection1155, owner, addr1;
