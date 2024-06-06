@@ -1,20 +1,23 @@
 const { expect } = require("chai");
-const { ethers } = require("ethers");
+const { ethers, upgrades } = require("hardhat");
+const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("NFTCollection1155", function () {
   let NFTCollection1155, nftCollection, owner, addr1, addr2;
   const mintPrice = ethers.parseEther("0.1"); // 0.1 ETH
   const maxSupply = 100;
-  const startTime = Math.floor(Date.now() / 1000); // current time
-  const endTime = startTime + 3600; // 1 hour from now
+  let startTime; // current time
+  let endTime; // 1 hour from now
 
   beforeEach(async function () {
     [owner, addr1, addr2, _] = await ethers.getSigners();
+    startTime = await time.latest();
+    endTime = startTime + 3600;
 
     NFTCollection1155 = await ethers.getContractFactory("NFTCollection1155");
 
     nftCollection = await NFTCollection1155.deploy();
-    await nftCollection.deployed();
+    await nftCollection.waitForDeployment();
     await nftCollection.initialize(
       "ipfs://test-uri",
       mintPrice,
@@ -46,7 +49,9 @@ describe("NFTCollection1155", function () {
     it("Should allow minting within the time frame", async function () {
       const amount = 1;
       const data = "0x";
-      await nftCollection.connect(addr1).mint(addr1.address, amount, data, { value: mintPrice });
+      await nftCollection
+        .connect(addr1)
+        .mint(addr1.address, amount, data, { value: mintPrice });
 
       expect(await nftCollection.balanceOf(addr1.address, 0)).to.equal(amount);
     });
@@ -57,10 +62,12 @@ describe("NFTCollection1155", function () {
 
       // Fast forward time to after the end time
       await ethers.provider.send("evm_increaseTime", [3600]);
-      await ethers.provider.send("evm_mine", []);
+      await ethers.provider.send("evm_mine");
 
       await expect(
-        nftCollection.connect(addr1).mint(addr1.address, amount, data, { value: mintPrice })
+        nftCollection
+          .connect(addr1)
+          .mint(addr1.address, amount, data, { value: mintPrice })
       ).to.be.revertedWith("Minting not active");
     });
 
@@ -70,7 +77,9 @@ describe("NFTCollection1155", function () {
       const insufficientFunds = ethers.parseEther("0.05"); // 0.05 ETH
 
       await expect(
-        nftCollection.connect(addr1).mint(addr1.address, amount, data, { value: insufficientFunds })
+        nftCollection
+          .connect(addr1)
+          .mint(addr1.address, amount, data, { value: insufficientFunds })
       ).to.be.revertedWith("Insufficient funds");
     });
 
@@ -79,14 +88,21 @@ describe("NFTCollection1155", function () {
       const data = "0x";
 
       await expect(
-        nftCollection.connect(addr1).mint(addr1.address, amount, data, { value: mintPrice * amount })
+        nftCollection
+          .connect(addr1)
+          .mint(addr1.address, amount, data, {
+            value: mintPrice * BigInt(amount),
+          })
       ).to.be.revertedWith("Max supply reached");
     });
   });
 
   describe("Royalties", function () {
     it("Should set the correct royalties", async function () {
-      const [receiver, royaltyAmount] = await nftCollection.royaltyInfo(0, ethers.parseEther("1"));
+      const [receiver, royaltyAmount] = await nftCollection.royaltyInfo(
+        0,
+        ethers.parseEther("1")
+      );
       expect(receiver).to.equal(owner.address);
       expect(royaltyAmount).to.equal(ethers.parseEther("0.05")); // 5% of 1 ETH
     });
