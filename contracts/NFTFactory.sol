@@ -7,68 +7,120 @@ import "./NFTCollection721.sol";
 import "./NFTCollection1155.sol";
 
 contract NFTFactory is Initializable, OwnableUpgradeable {
-    event ERC721CollectionCreated(address indexed collectionAddress);
-    event ERC1155CollectionCreated(address indexed collectionAddress);
+    event ProjectSubmitted(address indexed submitter, string projectDetails);
+    event ProjectApproved(address indexed project, address indexed approver);
+    event ProjectRejected(address indexed project, address indexed rejecter);
+
+    event ERC1155CollectionCreated(
+        address collection,
+        string name,
+        string symbol,
+        string description
+    );
+
+    enum ProjectStatus {
+        Pending,
+        Approved,
+        Rejected
+    }
+
+    struct Project {
+        string details;
+        ProjectStatus status;
+    }
+
+    mapping(address => bool) public admins;
+    mapping(address => Project) public submittedProjects;
+    mapping(address => bool) public approvedProjects;
+    mapping(address => address) public collectionOwners;
 
     function initialize() public initializer {
         __Ownable_init(msg.sender);
     }
 
-    function createERC721Collection(
-        string memory name,
-        string memory symbol,
-        string memory description,
-        uint256 mintPrice,
-        uint256 startTime,
-        uint256 endTime,
-        uint256 maxSupply,
-        bool isCapped,
-        address royaltyReceiver,
-        uint96 royaltyFraction,
-        address owner
-    ) external onlyOwner {
-        NFTCollection721 collection = new NFTCollection721();
-        NFTCollection721.InitParams memory params = NFTCollection721
-            .InitParams({
-                name: name,
-                symbol: symbol,
-                description: description,
-                mintPrice: mintPrice,
-                startTime: startTime,
-                endTime: endTime,
-                maxSupply: maxSupply,
-                isCapped: isCapped,
-                royaltyReceiver: royaltyReceiver,
-                royaltyFraction: royaltyFraction,
-                owner: owner
-            });
-        collection.initialize(params);
-        emit ERC721CollectionCreated(address(collection));
+    modifier onlyAdmin() {
+        require(admins[msg.sender] || msg.sender == owner(), "Not an admin");
+        _;
+    }
+
+    function addAdmin(address admin) public onlyOwner {
+        admins[admin] = true;
+    }
+
+    function removeAdmin(address admin) public onlyOwner {
+        admins[admin] = false;
+    }
+
+    function submitProject(string memory projectDetails) public {
+        submittedProjects[msg.sender] = Project({
+            details: projectDetails,
+            status: ProjectStatus.Pending
+        });
+
+        emit ProjectSubmitted(msg.sender, projectDetails);
+    }
+
+    function approveProject(address project) public onlyAdmin {
+        require(
+            submittedProjects[project].status == ProjectStatus.Pending,
+            "NFTFactory: project is not pending"
+        );
+        submittedProjects[project].status = ProjectStatus.Approved;
+        approvedProjects[project] = true;
+        emit ProjectApproved(project, msg.sender);
+    }
+
+    function rejectProject(address project) public onlyAdmin {
+        require(
+            submittedProjects[project].status == ProjectStatus.Pending,
+            "NFTFactory: project is not pending"
+        );
+        submittedProjects[project].status = ProjectStatus.Rejected;
+        emit ProjectRejected(project, msg.sender);
     }
 
     function createERC1155Collection(
-        string memory uri,
-        uint256 mintPrice,
-        uint256 startTime,
-        uint256 endTime,
-        uint256 maxSupply,
-        bool isCapped,
-        address royaltyReceiver,
-        uint96 royaltyFraction,
-        address owner
-    ) external onlyOwner {
+        string memory name_,
+        string memory symbol_,
+        string memory description_,
+        uint256 maxSupply_,
+        uint96 royaltyFeeNumerator
+    ) public {
+        require(maxSupply_ <= 100, "NFTFactory: maxSupply cannot exceed 100");
+        require(
+            approvedProjects[msg.sender],
+            "NFTFactory: project not approved"
+        );
+
         NFTCollection1155 collection = new NFTCollection1155();
         collection.initialize(
-            uri,
-            mintPrice,
-            startTime,
-            endTime,
-            maxSupply,
-            isCapped,
-            royaltyReceiver,
-            royaltyFraction,
-            owner
+            name_,
+            symbol_,
+            description_,
+            maxSupply_,
+            msg.sender,
+            royaltyFeeNumerator
         );
-        emit ERC1155CollectionCreated(address(collection));
+
+        submittedProjects[address(collection)] = Project({
+            details: string(
+                abi.encodePacked("Collection: ", name_, " - ", description_)
+            ),
+            status: ProjectStatus.Pending
+        });
+
+        collectionOwners[address(collection)] = msg.sender;
+
+        emit ERC1155CollectionCreated(
+            address(collection),
+            name_,
+            symbol_,
+            description_
+        );
+
+        emit ProjectSubmitted(
+            address(collection),
+            string(abi.encodePacked("Collection: ", name_, " - ", description_))
+        );
     }
 }

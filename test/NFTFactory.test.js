@@ -1,114 +1,140 @@
 const { expect } = require("chai");
-const { ethers, upgrades } = require("hardhat");
+const { ethers } = require("hardhat");
 
 describe("NFTFactory", function () {
-  let NFTFactory, factory, NFTCollection721, NFTCollection1155, owner, addr1;
-  const mintPrice = ethers.parseEther("0.1"); // 0.1 ETH
-  const maxSupply = 10;
-  const startTime = Math.floor(Date.now() / 1000); // current time
-  const endTime = startTime + 3600; // 1 hour from now
+  let NFTFactory;
+  let NFTCollection1155;
+  let nftFactory;
+  let nftCollection1155;
+  let owner;
+  let admin;
+  let addr1;
+  let addr2;
+  let addrs;
+
+  const projectDetails = "Test Project";
+  const name = "My ERC1155 Collection";
+  const symbol = "MNFT";
+  const description = "This is a description";
+  const maxSupply = 100;
+  const royaltyFeeNumerator = 500; // 5%
 
   beforeEach(async function () {
-    [owner, addr1] = await ethers.getSigners();
-
     NFTFactory = await ethers.getContractFactory("NFTFactory");
-    NFTCollection721 = await ethers.getContractFactory("NFTCollection721");
     NFTCollection1155 = await ethers.getContractFactory("NFTCollection1155");
+    [owner, admin, addr1, addr2, ...addrs] = await ethers.getSigners();
+    nftFactory = await NFTFactory.deploy();
+    await nftFactory.deployed();
+    await nftFactory.initialize();
 
-    factory = await upgrades.deployProxy(NFTFactory, [], {
-      initializer: "initialize",
-    });
-
-    await factory.waitForDeployment();
+    // Deploy the ERC1155 collection template
+    nftCollection1155 = await NFTCollection1155.deploy();
+    await nftCollection1155.deployed();
   });
 
-  describe("Deployment", function () {
+  describe("Initialization", function () {
     it("Should set the right owner", async function () {
-      expect(await factory.owner()).to.equal(owner.address);
+      expect(await nftFactory.owner()).to.equal(owner.address);
     });
   });
 
-  describe("Create ERC721 Collection", function () {
-    it("Should create an ERC721 collection", async function () {
-      const tx = await factory.createERC721Collection(
-        "TestNFT",
-        "TNFT",
-        "Test NFT Collection",
-        mintPrice,
-        startTime,
-        endTime,
-        maxSupply,
-        true,
-        owner.address,
-        500, // 5% royalties
-        owner.address
-      );
+  describe("Admin Management", function () {
+    it("Should allow the owner to add and remove admins", async function () {
+      await nftFactory.addAdmin(admin.address);
+      expect(await nftFactory.admins(admin.address)).to.equal(true);
 
-      const receipt = await tx.wait();
+      await nftFactory.removeAdmin(admin.address);
+      expect(await nftFactory.admins(admin.address)).to.equal(false);
+    });
 
-      const eventFragment = NFTFactory.interface.getEvent("ERC721CollectionCreated");
-      const event = receipt.logs
-        .map(log => {
-          try {
-            return NFTFactory.interface.decodeEventLog(eventFragment, log.data, log.topics);
-          } catch (error) {
-            return null;
-          }
-        })
-        .find(decoded => decoded !== null);
-
-      // Debugging: Log event details
-      console.log("ERC721 Collection Created Event:", event);
-
-      expect(event).to.not.be.undefined;
-
-      const collectionAddress = event.collectionAddress;
-      const nftCollection = await NFTCollection721.attach(collectionAddress);
-
-      expect(await nftCollection.name()).to.equal("TestNFT");
-      expect(await nftCollection.symbol()).to.equal("TNFT");
-      expect(await nftCollection.description()).to.equal("Test NFT Collection");
-      expect(await nftCollection.mintPrice()).to.equal(mintPrice);
+    it("Should not allow non-owners to add or remove admins", async function () {
+      await expect(nftFactory.connect(addr1).addAdmin(admin.address)).to.be.revertedWith("Not an admin");
+      await expect(nftFactory.connect(addr1).removeAdmin(admin.address)).to.be.revertedWith("Not an admin");
     });
   });
 
-  describe("Create ERC1155 Collection", function () {
-    it("Should create an ERC1155 collection", async function () {
-      const tx = await factory.createERC1155Collection(
-        "ipfs://test-uri",
-        mintPrice,
-        startTime,
-        endTime,
+  describe("Project Submission and Approval", function () {
+    it("Should allow users to submit projects", async function () {
+      await nftFactory.connect(addr1).submitProject(projectDetails);
+      const project = await nftFactory.submittedProjects(addr1.address);
+      expect(project.details).to.equal(projectDetails);
+      expect(project.status).to.equal(0); // Pending
+    });
+
+    it("Should allow admins to approve projects", async function () {
+      await nftFactory.connect(addr1).submitProject(projectDetails);
+      await nftFactory.addAdmin(admin.address);
+      await nftFactory.connect(admin).approveProject(addr1.address);
+
+      const project = await nftFactory.submittedProjects(addr1.address);
+      expect(project.status).to.equal(1); // Approved
+      expect(await nftFactory.approvedProjects(addr1.address)).to.equal(true);
+    });
+
+    it("Should allow admins to reject projects", async function () {
+      await nftFactory.connect(addr1).submitProject(projectDetails);
+      await nftFactory.addAdmin(admin.address);
+      await nftFactory.connect(admin).rejectProject(addr1.address);
+
+      const project = await nftFactory.submittedProjects(addr1.address);
+      expect(project.status).to.equal(2); // Rejected
+      expect(await nftFactory.approvedProjects(addr1.address)).to.equal(false);
+    });
+
+    it("Should not allow non-admins to approve or reject projects", async function () {
+      await nftFactory.connect(addr1).submitProject(projectDetails);
+      await expect(nftFactory.connect(addr2).approveProject(addr1.address)).to.be.revertedWith("Not an admin");
+      await expect(nftFactory.connect(addr2).rejectProject(addr1.address)).to.be.revertedWith("Not an admin");
+    });
+  });
+
+  describe("ERC1155 Collection Creation", function () {
+    beforeEach(async function () {
+      await nftFactory.connect(addr1).submitProject(projectDetails);
+      await nftFactory.addAdmin(admin.address);
+      await nftFactory.connect(admin).approveProject(addr1.address);
+    });
+
+    it("Should allow approved projects to create ERC1155 collections", async function () {
+      await nftFactory.connect(addr1).createERC1155Collection(
+        name,
+        symbol,
+        description,
         maxSupply,
-        true,
-        owner.address,
-        500, // 5% royalties
-        owner.address
+        royaltyFeeNumerator
       );
 
-      const receipt = await tx.wait();
+      const project = await nftFactory.submittedProjects(await nftFactory.collectionOwners(addr1.address));
+      expect(project.details).to.equal(`Collection: ${name} - ${description}`);
+      expect(project.status).to.equal(0); // Pending
 
-      const eventFragment = NFTFactory.interface.getEvent("ERC1155CollectionCreated");
-      const event = receipt.logs
-        .map(log => {
-          try {
-            return NFTFactory.interface.decodeEventLog(eventFragment, log.data, log.topics);
-          } catch (error) {
-            return null;
-          }
-        })
-        .find(decoded => decoded !== null);
+      const collectionOwner = await nftFactory.collectionOwners(await nftFactory.collectionOwners(addr1.address));
+      expect(collectionOwner).to.equal(addr1.address);
+    });
 
-      // Debugging: Log event details
-      console.log("ERC1155 Collection Created Event:", event);
+    it("Should not allow non-approved projects to create ERC1155 collections", async function () {
+      await nftFactory.connect(addr2).submitProject(projectDetails);
+      await expect(
+        nftFactory.connect(addr2).createERC1155Collection(
+          name,
+          symbol,
+          description,
+          maxSupply,
+          royaltyFeeNumerator
+        )
+      ).to.be.revertedWith("NFTFactory: project not approved");
+    });
 
-      expect(event).to.not.be.undefined;
-
-      const collectionAddress = event.collectionAddress;
-      const nftCollection = await NFTCollection1155.attach(collectionAddress);
-
-      expect(await nftCollection.uri(0)).to.equal("ipfs://test-uri");
-      expect(await nftCollection.mintPrice()).to.equal(mintPrice);
+    it("Should not allow creating ERC1155 collections with maxSupply > 100", async function () {
+      await expect(
+        nftFactory.connect(addr1).createERC1155Collection(
+          name,
+          symbol,
+          description,
+          101, // maxSupply greater than 100
+          royaltyFeeNumerator
+        )
+      ).to.be.revertedWith("NFTFactory: maxSupply cannot exceed 100");
     });
   });
 });
