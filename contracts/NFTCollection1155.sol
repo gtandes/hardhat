@@ -5,14 +5,14 @@ import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/common/ERC2981Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+
+// import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 contract NFTCollection1155 is
     Initializable,
     ERC1155Upgradeable,
     OwnableUpgradeable,
-    ERC2981Upgradeable,
-    ReentrancyGuardUpgradeable
+    ERC2981Upgradeable
 {
     string public name;
     string public symbol;
@@ -63,7 +63,6 @@ contract NFTCollection1155 is
         __ERC1155_init("");
         __Ownable_init(msg.sender);
         __ERC2981_init();
-        __ReentrancyGuard_init();
         name = name_;
         symbol = symbol_;
         description = description_;
@@ -85,7 +84,7 @@ contract NFTCollection1155 is
         uint256 amount,
         bytes memory data,
         string memory tokenURI_
-    ) public onlyOwner supplyCheck(amount) nonReentrant {
+    ) public onlyOwner supplyCheck(amount) {
         _mint(to, id, amount, data);
         _setTokenURI(id, tokenURI_);
         totalMinted += amount;
@@ -99,7 +98,7 @@ contract NFTCollection1155 is
         uint256[] memory amounts,
         bytes memory data,
         string[] memory tokenURIs
-    ) public onlyOwner nonReentrant {
+    ) public onlyOwner {
         uint256 totalAmount = 0;
         for (uint256 i = 0; i < amounts.length; i++) {
             totalAmount += amounts[i];
@@ -121,7 +120,7 @@ contract NFTCollection1155 is
     function setTokenSalePrice(
         uint256 tokenId,
         uint256 price
-    ) public onlyOwner nonReentrant {
+    ) public onlyOwner {
         require(
             price >= MIN_PRICE && price <= MAX_PRICE,
             "NFTCollection1155: Sale price must be between 0 and 250 Ether (equivalent to $1,000,000 at $4,000/Ether)"
@@ -135,7 +134,7 @@ contract NFTCollection1155 is
         bool forSale,
         uint256 startTime,
         uint256 endTime
-    ) public onlyOwner nonReentrant {
+    ) public onlyOwner {
         require(startTime < endTime, "Invalid listing time");
         tokenForSale[tokenId] = forSale;
         listingStartTime[tokenId] = startTime;

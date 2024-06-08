@@ -49,12 +49,24 @@ describe("NFTCollection1155", function () {
   });
 
   describe("Minting", function () {
-    it("Should mint tokens and update totalMinted", async function () {
+    it("Should mint tokens to owner and update totalMinted", async function () {
       const tokenId = 1;
       const amount = 10;
       const tokenURI = "https://example.com/token/1";
 
-      await nftCollection.mint(owner.address, tokenId, amount, [], tokenURI);
+      await nftCollection.mint(owner.address, tokenId, amount, "0x", tokenURI);
+      expect(await nftCollection.totalMinted()).to.equal(amount);
+
+      const uri = await nftCollection.uri(tokenId);
+      expect(uri).to.equal(tokenURI);
+    });
+
+    it("Should mint tokens to another address and update totalMinted", async function () {
+      const tokenId = 1;
+      const amount = 10;
+      const tokenURI = "https://example.com/token/1";
+
+      await nftCollection.mint(addr1.address, tokenId, amount, "0x", tokenURI);
       expect(await nftCollection.totalMinted()).to.equal(amount);
 
       const uri = await nftCollection.uri(tokenId);
@@ -70,7 +82,7 @@ describe("NFTCollection1155", function () {
         "https://example.com/token/3",
       ];
 
-      await nftCollection.mintBatch(owner.address, tokenIds, amounts, [], tokenURIs);
+      await nftCollection.mintBatch(owner.address, tokenIds, amounts, "0x", tokenURIs);
 
       const totalMinted = amounts.reduce((a, b) => a + b, 0);
       expect(await nftCollection.totalMinted()).to.equal(totalMinted);
@@ -87,7 +99,7 @@ describe("NFTCollection1155", function () {
       const tokenURI = "https://example.com/token/1";
 
       await expect(
-        nftCollection.mint(owner.address, tokenId, amount, [], tokenURI)
+        nftCollection.mint(owner.address, tokenId, amount, "0x", tokenURI)
       ).to.be.revertedWith("NFTCollection1155: Exceeds max supply");
     });
   });
@@ -140,6 +152,43 @@ describe("NFTCollection1155", function () {
       const tokenId = 1;
 
       expect(await nftCollection.isTokenForSale(tokenId)).to.equal(false);
+    });
+  });
+
+  describe("Ownership and Permissions", function () {
+    it("Should only allow owner to mint tokens", async function () {
+      const tokenId = 1;
+      const amount = 10;
+      const tokenURI = "https://example.com/token/1";
+
+      try {
+        await nftCollection.connect(addr1).mint(addr1.address, tokenId, amount, "0x", tokenURI);
+      } catch (error) {
+        console.error(error.message);
+        expect(error.message).to.include("Ownable: caller is not the owner");
+      }
+    });
+
+    it("Should allow owner to transfer ownership", async function () {
+      await nftCollection.transferOwnership(addr1.address);
+      expect(await nftCollection.owner()).to.equal(addr1.address);
+    });
+
+    it("Should only allow new owner to mint tokens after ownership transfer", async function () {
+      const tokenId = 1;
+      const amount = 10;
+      const tokenURI = "https://example.com/token/1";
+
+      await nftCollection.transferOwnership(addr1.address);
+      try {
+        await nftCollection.mint(addr1.address, tokenId, amount, "0x", tokenURI);
+      } catch (error) {
+        console.error(error.message);
+        expect(error.message).to.include("Ownable: caller is not the owner");
+      }
+
+      await nftCollection.connect(addr1).mint(addr1.address, tokenId, amount, "0x", tokenURI);
+      expect(await nftCollection.totalMinted()).to.equal(amount);
     });
   });
 });
