@@ -24,12 +24,12 @@ describe("NFTFactory", function () {
     NFTCollection1155 = await ethers.getContractFactory("NFTCollection1155");
     [owner, admin, addr1, addr2, ...addrs] = await ethers.getSigners();
     nftFactory = await NFTFactory.deploy();
-    await nftFactory.deployed();
+    await nftFactory.waitForDeployment();
     await nftFactory.initialize();
 
     // Deploy the ERC1155 collection template
     nftCollection1155 = await NFTCollection1155.deploy();
-    await nftCollection1155.deployed();
+    await nftCollection1155.waitForDeployment();
   });
 
   describe("Initialization", function () {
@@ -104,11 +104,12 @@ describe("NFTFactory", function () {
         royaltyFeeNumerator
       );
 
-      const project = await nftFactory.submittedProjects(await nftFactory.collectionOwners(addr1.address));
+      const collectionAddress = await nftFactory.collectionOwners(addr1.address);
+      const project = await nftFactory.submittedProjects(collectionAddress);
       expect(project.details).to.equal(`Collection: ${name} - ${description}`);
       expect(project.status).to.equal(0); // Pending
 
-      const collectionOwner = await nftFactory.collectionOwners(await nftFactory.collectionOwners(addr1.address));
+      const collectionOwner = await nftFactory.collectionOwners(collectionAddress);
       expect(collectionOwner).to.equal(addr1.address);
     });
 
