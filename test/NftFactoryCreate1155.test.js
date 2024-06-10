@@ -48,8 +48,13 @@ describe("NFTFactory", function () {
     });
 
     it("Should not allow non-owners to add or remove admins", async function () {
-      await expect(nftFactory.connect(addr1).addAdmin(admin.address)).to.be.revertedWith("Not an admin");
-      await expect(nftFactory.connect(addr1).removeAdmin(admin.address)).to.be.revertedWith("Not an admin");
+      await expect(
+        nftFactory.connect(addr1).addAdmin(admin.address)
+      ).to.be.revertedWith("Not an admin");
+
+      await expect(
+        nftFactory.connect(addr1).removeAdmin(admin.address)
+      ).to.be.revertedWith("Not an admin");
     });
   });
 
@@ -96,7 +101,7 @@ describe("NFTFactory", function () {
     });
 
     it("Should allow approved projects to create ERC1155 collections", async function () {
-      await nftFactory.connect(addr1).createERC1155Collection(
+      const tx = await nftFactory.connect(addr1).createERC1155Collection(
         name,
         symbol,
         description,
@@ -104,7 +109,36 @@ describe("NFTFactory", function () {
         royaltyFeeNumerator
       );
 
-      const collectionAddress = await nftFactory.collectionOwners(addr1.address);
+      const receipt = await tx.wait();
+      console.log("Transaction receipt:", receipt);
+      console.log("Logs:", receipt.logs);
+
+      // Define the event ABI
+      const eventAbi = [
+        "event ERC1155CollectionCreated(address indexed owner, address indexed collectionAddress, string name, string symbol, string description, uint256 maxSupply, uint256 royaltyFeeNumerator)"
+      ];
+
+      // Create an interface with the event ABI
+      const iface = new ethers.utils.Interface(eventAbi);
+
+      // Find the log entry for the event
+      const log = receipt.logs.find(
+        log => log.topics[0] === iface.getEventTopic("ERC1155CollectionCreated")
+      );
+
+      // Parse the log entry
+      const event = iface.parseLog(log);
+      console.log("Event:", event);
+
+      expect(event).to.not.be.undefined;
+      const collectionAddress = event.args.collectionAddress;
+      expect(event.args.owner).to.equal(addr1.address);
+      expect(event.args.name).to.equal(name);
+      expect(event.args.symbol).to.equal(symbol);
+      expect(event.args.description).to.equal(description);
+      expect(event.args.maxSupply).to.equal(maxSupply);
+      expect(event.args.royaltyFeeNumerator).to.equal(royaltyFeeNumerator);
+
       const project = await nftFactory.submittedProjects(collectionAddress);
       expect(project.details).to.equal(`Collection: ${name} - ${description}`);
       expect(project.status).to.equal(0); // Pending

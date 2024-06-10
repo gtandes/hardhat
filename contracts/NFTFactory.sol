@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-// import "./NFTCollection721.sol";
 import "./NFTCollection1155.sol";
 
 contract NFTFactory is Initializable, OwnableUpgradeable {
@@ -12,10 +11,13 @@ contract NFTFactory is Initializable, OwnableUpgradeable {
     event ProjectRejected(address indexed project, address indexed rejecter);
 
     event ERC1155CollectionCreated(
-        address collection,
+        address indexed owner,
+        address indexed collectionAddress,
         string name,
         string symbol,
-        string description
+        string description,
+        uint256 maxSupply,
+        uint256 royaltyFeeNumerator
     );
 
     enum ProjectStatus {
@@ -93,6 +95,7 @@ contract NFTFactory is Initializable, OwnableUpgradeable {
         );
 
         NFTCollection1155 collection = new NFTCollection1155();
+
         collection.initialize(
             name_,
             symbol_,
@@ -112,10 +115,13 @@ contract NFTFactory is Initializable, OwnableUpgradeable {
         collectionOwners[address(collection)] = msg.sender;
 
         emit ERC1155CollectionCreated(
+            msg.sender,
             address(collection),
             name_,
             symbol_,
-            description_
+            description_,
+            maxSupply_,
+            royaltyFeeNumerator
         );
 
         emit ProjectSubmitted(
