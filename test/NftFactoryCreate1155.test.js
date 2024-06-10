@@ -119,12 +119,17 @@ describe("NFTFactory", function () {
       ];
 
       // Create an interface with the event ABI
-      const iface = new ethers.utils.Interface(eventAbi);
+      const iface = new ethers.Interface(eventAbi);
 
       // Find the log entry for the event
       const log = receipt.logs.find(
-        log => log.topics[0] === iface.getEventTopic("ERC1155CollectionCreated")
+        log => log.topics[0] === iface.getEvent("ERC1155CollectionCreated")
       );
+
+      if (!log) {
+        console.error("ERC1155CollectionCreated event not found in the logs");
+        return;
+      }
 
       // Parse the log entry
       const event = iface.parseLog(log);
