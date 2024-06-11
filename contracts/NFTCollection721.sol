@@ -5,16 +5,12 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/common/ERC2981Upgradeable.sol";
-// import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-
-// import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract NFTCollection721 is
     Initializable,
     ERC721Upgradeable,
     OwnableUpgradeable,
-    ERC2981Upgradeable,
-    // ReentrancyGuard
+    ERC2981Upgradeable
 {
     string public description;
     uint256 public maxSupply;
@@ -56,7 +52,6 @@ contract NFTCollection721 is
         __ERC721_init(name_, symbol_);
         __Ownable_init(msg.sender);
         __ERC2981_init();
-        __ReentrancyGuard_init();
         description = description_;
         maxSupply = maxSupply_;
         _setDefaultRoyalty(royaltyReceiver, royaltyFeeNumerator);
@@ -74,9 +69,7 @@ contract NFTCollection721 is
         address to,
         uint256 tokenId,
         string memory tokenURI_
-    ) public onlyOwner supplyCheck(1)
-    // nonReentrant
-     {
+    ) public onlyOwner supplyCheck(1) {
         _mint(to, tokenId);
         _setTokenURI(tokenId, tokenURI_);
         totalMinted += 1;
@@ -87,9 +80,7 @@ contract NFTCollection721 is
     function setTokenSalePrice(
         uint256 tokenId,
         uint256 price
-    ) public onlyOwner
-    // nonReentrant 
-    {
+    ) public onlyOwner {
         require(
             price >= MIN_PRICE && price <= MAX_PRICE,
             "NFTCollection721: Sale price must be between 0 and 250 Ether (equivalent to $1,000,000 at $4,000/Ether)"
@@ -103,9 +94,7 @@ contract NFTCollection721 is
         bool forSale,
         uint256 startTime,
         uint256 endTime
-    ) public onlyOwner 
-    // nonReentrant
-     {
+    ) public onlyOwner {
         require(startTime < endTime, "Invalid listing time");
         tokenForSale[tokenId] = forSale;
         listingStartTime[tokenId] = startTime;
@@ -123,10 +112,10 @@ contract NFTCollection721 is
     function tokenURI(
         uint256 tokenId
     ) public view override returns (string memory) {
-        require(
-            _exists(tokenId),
-            "ERC721Metadata: URI query for nonexistent token"
-        );
+        // require(
+        //     _exists(tokenId),
+        //     "ERC721Metadata: URI query for nonexistent token"
+        // );
         return _tokenURIs[tokenId];
     }
 

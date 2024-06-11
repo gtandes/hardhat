@@ -21,7 +21,7 @@ contract NFTCollection1155 is
     uint256 public totalMinted;
 
     uint256 public constant MIN_PRICE = 0;
-    uint256 public constant MAX_PRICE = 250 * 10 ** 18;
+    uint256 public constant MAX_PRICE = 250 * 10 ** 18; // 250 Ether in wei (equivalent to $1,000,000 at $4,000/Ether)
 
     mapping(uint256 => string) private _tokenURIs;
     mapping(uint256 => uint256) public tokenSalePrice;
