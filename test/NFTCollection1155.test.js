@@ -161,12 +161,10 @@ describe("NFTCollection1155", function () {
       const amount = 10;
       const tokenURI = "https://example.com/token/1";
 
-      try {
-        await nftCollection.connect(addr1).mint(addr1.address, tokenId, amount, "0x", tokenURI);
-      } catch (error) {
-        console.error(error.message);
-        expect(error.message).to.include("Ownable: caller is not the owner");
-      }
+      // Try minting with a non-owner account and expect a revert
+      await expect(
+        nftCollection.connect(addr1).mint(addr1.address, tokenId, amount, "0x", tokenURI)
+      ).to.be.revertedWithCustomError(nftCollection, "OwnableUnauthorizedAccount");
     });
 
     it("Should allow owner to transfer ownership", async function () {
@@ -180,14 +178,13 @@ describe("NFTCollection1155", function () {
       const tokenURI = "https://example.com/token/1";
 
       await nftCollection.transferOwnership(addr1.address);
-      try {
-        await nftCollection.mint(addr1.address, tokenId, amount, "0x", tokenURI);
-      } catch (error) {
-        console.error(error.message);
-        expect(error.message).to.include("Ownable: caller is not the owner");
-      }
+
+      await expect(
+        nftCollection.mint(addr1.address, tokenId, amount, "0x", tokenURI)
+      ).to.be.revertedWithCustomError(nftCollection, "OwnableUnauthorizedAccount");
 
       await nftCollection.connect(addr1).mint(addr1.address, tokenId, amount, "0x", tokenURI);
+      
       expect(await nftCollection.totalMinted()).to.equal(amount);
     });
   });

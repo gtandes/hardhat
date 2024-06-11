@@ -50,11 +50,11 @@ describe("NFTFactory", function () {
     it("Should not allow non-owners to add or remove admins", async function () {
       await expect(
         nftFactory.connect(addr1).addAdmin(admin.address)
-      ).to.be.revertedWith("Not an admin");
+      ).to.be.revertedWithCustomError(nftFactory, "OwnableUnauthorizedAccount");
 
       await expect(
         nftFactory.connect(addr1).removeAdmin(admin.address)
-      ).to.be.revertedWith("Not an admin");
+      ).to.be.revertedWithCustomError(nftFactory, "OwnableUnauthorizedAccount");
     });
   });
 
@@ -110,8 +110,8 @@ describe("NFTFactory", function () {
       );
 
       const receipt = await tx.wait();
-      console.log("Transaction receipt:", receipt);
-      console.log("Logs:", receipt.logs);
+      // console.log("Transaction receipt:", receipt);
+      // console.log("Logs:", receipt.logs);
 
       // Define the event ABI
       const eventAbi = [
@@ -133,7 +133,7 @@ describe("NFTFactory", function () {
 
       // Parse the log entry
       const event = iface.parseLog(log);
-      console.log("Event:", event);
+      // console.log("Event:", event);
 
       expect(event).to.not.be.undefined;
       const collectionAddress = event.args.collectionAddress;
