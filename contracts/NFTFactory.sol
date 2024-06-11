@@ -3,14 +3,26 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./NFTCollection1155.sol";
+import "./NFTCollection721.sol";
 
-contract NFTFactory is Initializable, OwnableUpgradeable {
+contract NFTFactory is Initializable, OwnableUpgradeable, ReentrancyGuard {
     event ProjectSubmitted(address indexed submitter, string projectDetails);
     event ProjectApproved(address indexed project, address indexed approver);
     event ProjectRejected(address indexed project, address indexed rejecter);
 
     event ERC1155CollectionCreated(
+        address indexed owner,
+        address indexed collectionAddress,
+        string name,
+        string symbol,
+        string description,
+        uint256 maxSupply,
+        uint256 royaltyFeeNumerator
+    );
+
+    event ERC721CollectionCreated(
         address indexed owner,
         address indexed collectionAddress,
         string name,
@@ -87,7 +99,7 @@ contract NFTFactory is Initializable, OwnableUpgradeable {
         string memory description_,
         uint256 maxSupply_,
         uint96 royaltyFeeNumerator
-    ) public {
+    ) public nonReentrant {
         require(maxSupply_ <= 100, "NFTFactory: maxSupply cannot exceed 100");
         require(
             approvedProjects[msg.sender],
@@ -115,6 +127,55 @@ contract NFTFactory is Initializable, OwnableUpgradeable {
         collectionOwners[address(collection)] = msg.sender;
 
         emit ERC1155CollectionCreated(
+            msg.sender,
+            address(collection),
+            name_,
+            symbol_,
+            description_,
+            maxSupply_,
+            royaltyFeeNumerator
+        );
+
+        emit ProjectSubmitted(
+            address(collection),
+            string(abi.encodePacked("Collection: ", name_, " - ", description_))
+        );
+    }
+
+    function createERC721Collection(
+        string memory name_,
+        string memory symbol_,
+        string memory description_,
+        uint256 maxSupply_,
+        uint96 royaltyFeeNumerator
+    ) public nonReentrant {
+        require(maxSupply_ <= 100, "NFTFactory: maxSupply cannot exceed 100");
+        require(
+            approvedProjects[msg.sender],
+            "NFTFactory: project not approved"
+        );
+
+        NFTCollection721 collection = new NFTCollection721();
+
+        collection.initialize(
+            name_,
+            symbol_,
+            description_,
+            maxSupply_,
+            msg.sender,
+            royaltyFeeNumerator
+        );
+
+        submittedProjects[address(collection)] = Project({
+            details: string(
+                abi.encodePacked("Collection: ", name_, " - ", description_)
+            ),
+            status: ProjectStatus.Pending
+        });
+
+        collectionOwners[address(collection)] = msg.sender;
+
+        emit ERC721CollectionCreated(
             msg.sender,
             address(collection),
             name_,

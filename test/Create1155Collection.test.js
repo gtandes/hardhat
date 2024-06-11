@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("NFTFactory", function () {
+describe("createERC1155Collection", function () {
   let NFTFactory;
   let NFTCollection1155;
   let nftFactory;
