@@ -3,7 +3,9 @@ const { ethers } = require("hardhat");
 
 describe("NFTCollection1155", function () {
   let NFTCollection1155;
+  let ReentrancyMock;
   let nftCollection;
+  let reentrancyMock;
   let owner;
   let addr1;
   let addr2;
@@ -17,10 +19,18 @@ describe("NFTCollection1155", function () {
   const royaltyFeeNumerator = 500; // 5%
 
   beforeEach(async function () {
+    // Get the contract factories
     NFTCollection1155 = await ethers.getContractFactory("NFTCollection1155");
+    ReentrancyMock = await ethers.getContractFactory("ReentrancyMock");
+
+    // Get the signers
     [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
+
+    // Deploy the NFTCollection1155 contract
     nftCollection = await NFTCollection1155.deploy();
     await nftCollection.waitForDeployment();
+
+    // Initialize the NFTCollection1155 contract
     await nftCollection.initialize(
       name,
       symbol,
@@ -29,6 +39,10 @@ describe("NFTCollection1155", function () {
       royaltyReceiver,
       royaltyFeeNumerator
     );
+
+    // Deploy the ReentrancyMock contract with the address of the waitForDeployment NFTCollection1155 contract
+    reentrancyMock = await ReentrancyMock.deploy(nftCollection.address);
+    await reentrancyMock.waitForDeployment();
   });
 
   describe("Initialization", function () {
@@ -107,7 +121,7 @@ describe("NFTCollection1155", function () {
   describe("Token Sale", function () {
     it("Should set token sale price", async function () {
       const tokenId = 1;
-      const price = ethers.parseEther("1"); // 1 Ether
+      const price = ethers.utils.parseEther("1"); // 1 Ether
 
       await nftCollection.setTokenSalePrice(tokenId, price);
       expect(await nftCollection.tokenSalePrice(tokenId)).to.equal(price);
@@ -115,7 +129,7 @@ describe("NFTCollection1155", function () {
 
     it("Should revert if token sale price is out of bounds", async function () {
       const tokenId = 1;
-      const price = ethers.parseEther("300"); // 300 Ether
+      const price = ethers.utils.parseEther("300"); // 300 Ether
 
       await expect(
         nftCollection.setTokenSalePrice(tokenId, price)
@@ -164,7 +178,7 @@ describe("NFTCollection1155", function () {
       // Try minting with a non-owner account and expect a revert
       await expect(
         nftCollection.connect(addr1).mint(addr1.address, tokenId, amount, "0x", tokenURI)
-      ).to.be.revertedWithCustomError(nftCollection, "OwnableUnauthorizedAccount");
+      ).to.be.revertedWith("Ownable: caller is not the owner");
     });
 
     it("Should allow owner to transfer ownership", async function () {
@@ -181,11 +195,61 @@ describe("NFTCollection1155", function () {
 
       await expect(
         nftCollection.mint(addr1.address, tokenId, amount, "0x", tokenURI)
-      ).to.be.revertedWithCustomError(nftCollection, "OwnableUnauthorizedAccount");
+      ).to.be.revertedWith("Ownable: caller is not the owner");
 
       await nftCollection.connect(addr1).mint(addr1.address, tokenId, amount, "0x", tokenURI);
-      
+
       expect(await nftCollection.totalMinted()).to.equal(amount);
+    });
+  });
+
+  describe("Reentrancy Protection", function () {
+    it("Should prevent reentrancy in mint function", async function () {
+      const tokenId = 1;
+      const amount = 10;
+      const tokenURI = "https://example.com/token/1";
+
+      // Trigger reentrancy attack
+      await expect(
+        reentrancyMock.triggerReentrancy(tokenId, amount, tokenURI)
+      ).to.be.revertedWith("ReentrancyGuard: reentrant call");
+    });
+
+    it("Should prevent reentrancy in mintBatch function", async function () {
+      const tokenIds = [1, 2, 3];
+      const amounts = [10, 20, 30];
+      const tokenURIs = [
+        "https://example.com/token/1",
+        "https://example.com/token/2",
+        "https://example.com/token/3",
+      ];
+
+      // Trigger reentrancy attack
+      await expect(
+        reentrancyMock.triggerReentrancy(tokenIds[0], amounts[0], tokenURIs[0])
+      ).to.be.revertedWith("ReentrancyGuard: reentrant call");
+    });
+
+    it("Should prevent reentrancy in setTokenSalePrice function", async function () {
+      const tokenId = 1;
+      const price = ethers.utils.parseEther("1"); // 1 Ether
+
+      // Trigger reentrancy attack
+      await expect(
+        reentrancyMock.triggerReentrancy(tokenId, price, "")
+      ).to.be.revertedWith("ReentrancyGuard: reentrant call");
+    });
+
+    it("Should prevent reentrancy in setTokenForSale function", async function () {
+      const tokenId = 1;
+      const forSale = true;
+      const startTime = Math.floor(Date.now() / 1000); // Current time
+      const endTime = startTime + 3600; // One hour later
+
+      // Trigger reentrancy attack
+      await expect(
+        reentrancyMock.triggerReentrancy(tokenId, forSale, startTime.toString())
+      ).to.be.revertedWith("ReentrancyGuard: reentrant call");
     });
   });
 });
